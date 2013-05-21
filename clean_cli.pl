@@ -199,14 +199,14 @@ sub print_status {
         my $stat = $jsort ? strftime( "%D", localtime( $jobtimes{$id}->{timestamp} ) )
                           : $j->{currtotal} . '%';
         printf "%02d: %-60s (%s)\n", $i, $jobs{$id}->{jobname}, $stat;
-        last if $i++ > $limit;
+        last if ++$i > $limit;
     }
     print "\n";
     &main_prompt();
 }
 
 sub main_prompt {
-    print "You may (a)dd a new job, (e)dit an existing job, change the (s)ort order, or\n (q)uit.\n\n";
+    print "You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,\n change the (s)ort order, or (q)uit.\n\n";
     my $input = &print_prompt();
     &parse_input($input);
 }
@@ -233,6 +233,8 @@ sub parse_input {
         return &prompt_add();
     } elsif ( $c =~ /^e/ ) {
         return &prompt_edit( @args );
+    } elsif ( $c =~ /^m/ ) {
+        return &prompt_edit( @args, 0 );
     } else {
         print "Sorry, I don't know what you mean by that.\n";
         return &main_prompt();
@@ -241,12 +243,13 @@ sub parse_input {
 
 sub prompt_edit {
     my @args = @_;
-    unless ( @args ) {
+    unless ( @args && $args[0] ) {
         print "Please type the number of the job you wish to edit.\n\n";
         my $input = &print_prompt();
-        @args = ($input);
+        @args = ( $input, $args[0] );
     }
     my $j = $args[0];
+    exit 0 if $j eq 'q';
     my @print_jobs = $jsort ? @jobtimes : @$jobs;
     my $job = $print_jobs[$j-1];
     if ( $j !~ /^\d+$/ or $j > $limit or $j < 1 or ! $job->{jobid} ) {
@@ -254,8 +257,23 @@ sub prompt_edit {
         return &main_prompt();
     }
     &show_details( $job->{jobid} );
-    my $continue = &print_prompt( 'Enter new data for this job? [Y/N] > ' );
-    return &prompt_add( $job->{jobid} ) if $continue && $continue =~ /^y/i;
+
+    my $p = $args[1];
+    if ( defined $p and $p =~ /^-?\d+$/ ) {
+        my $delta = 0;
+        $delta = $p - $job->{currtotal} if defined $job->{currtotal};
+        my $continue = &print_prompt( "Reset the urgency of this job to $p%? [Y/N] > " );
+        if ( $continue && $continue =~ /^y/i ) {
+            $dbh->do( 'UPDATE jobs SET currtotal=? WHERE jobid=?',
+                      undef, $p, $job->{jobid} );
+            $dbh->do( 'INSERT INTO timelog (jobid, timestamp, percent)' .
+                      ' VALUES (?,?,?)', undef, $job->{jobid}, time, $delta );
+            &reload_jobs();
+        }
+    } else {
+        my $continue = &print_prompt( 'Enter new data for this job? [Y/N] > ' );
+        return &prompt_add( $job->{jobid} ) if $continue && $continue =~ /^y/i;
+    }
     &print_status;
 }
 
@@ -278,6 +296,7 @@ sub show_details {
     foreach ( @lines ) {
         printf "%s: %s\n", $_->[0], $_->[1];
     }
+    print "\n";
 }
 
 sub prompt_add {
@@ -288,9 +307,10 @@ sub prompt_add {
 
     my $append = sub { $_[0] . ( $_[1] ? " \[$_[1]\]" : '' ) . ': ' };
 
-    my $jobname = &print_prompt( $append->( "New job name", $jdata->{jobname} ) );
+    my $jobname = &print_prompt( $append->( "New job name (45 char max)", $jdata->{jobname} ) );
     $jobname = $jdata->{jobname} unless length $jobname;
     return &main_prompt() unless $jobname;
+    $jobname = substr( $jobname, 0, 45 );  # truncate names longer than 45 chars
 
     my $freq = &print_prompt( $append->( "Number of days between updates", $jdata->{frequency} ) );
     $freq = $jdata->{frequency} || 0 unless length $freq;
@@ -322,7 +342,7 @@ sub prompt_add {
         $dbh->do( 'UPDATE jobs SET jobname=?, frequency=?, urgency=?, regid=?, currtotal=?' .
                   ' WHERE jobid=?', undef, $jobname, $freq, $urg, $regid, $curr, $jobid );
 
-    } elsif ( $jobname && $freq =~ /^\d+$/ && $urg =~ /^\d+$/ && $curr =~ /^\d+$/ ) {
+    } elsif ( $jobname && $freq =~ /^\d+$/ && $urg =~ /^\d+$/ && $curr =~ /^-?\d+$/ ) {
         $dbh->do( 'INSERT INTO jobs (jobname, frequency, urgency, regid, currtotal)' .
                   ' VALUES (?,?,?,?,?)', undef, $jobname, $freq, $urg, $regid, $curr );
         ( $jobid ) = $dbh->selectrow_array( 'SELECT jobid FROM jobs WHERE jobname=?',
@@ -342,7 +362,7 @@ sub prompt_add {
     warn "Could not save job: no job name given.\n" unless $jobname;
     warn "Could not save job: invalid frequency.\n" if $freq !~ /^\d+$/;
     warn "Could not save job: invalid urgency.\n" if $urg !~ /^\d+$/;
-    warn "Could not save job: invalid current total.\n" if $curr !~ /^\d+$/;
+    warn "Could not save job: invalid current total.\n" if $curr !~ /^-?\d+$/;
     &main_prompt();
 }
 
@@ -365,6 +385,10 @@ sub prompt_region {
         my $newreg = &print_prompt( "New region name: " );
         unless ( &is_unique_regname( $newreg ) ) {
             print "There is already a region with that name.\n\n";
+            return &prompt_region( @_ );
+        }
+        if ( length $newreg > 60 ) {
+            print "Region names should not be longer than 60 characters.\n\n";
             return &prompt_region( @_ );
         }
         $dbh->do( 'INSERT INTO regions (regname) VALUES (?)', undef, $newreg );
@@ -391,6 +415,10 @@ sub rename_region {
     if ( defined $newname and length $newname ) {
         unless ( &is_unique_regname( $newname ) || lc $newname eq lc $regnames{$regid} ) {
             print "There is already a region with that name.\n\n";
+            return &rename_region( @_ );
+        }
+        if ( length $newname > 60 ) {
+            print "Region names should not be longer than 60 characters.\n\n";
             return &rename_region( @_ );
         }
         $dbh->do( 'UPDATE regions SET regname=? WHERE regid=?', undef, $newname, $regid );

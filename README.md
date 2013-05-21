@@ -17,6 +17,18 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 Changes
 -------
 
+### 21 May 2013
+
+Added a new command 'm' to mark a job as completed without having to look
+at the full set of prompts to edit the item.
+
+Enforced limits of 45 characters for job names and 60 characters for regions.
+
+Fixed a minor bug where the list would cut off at 21 items instead of 20.
+
+Fixed a minor bug where negative totals were not recognized by the parser.
+
+
 ### 8 May 2013
 
 Initial release.
@@ -70,8 +82,8 @@ example output:
     10: Vacuum Carpet Downstairs                                     (10%)
     11: Clean Microwave                                              (0%)
 
-    You may (a)dd a new job, (e)dit an existing job, change the (s)ort order, or
-     (q)uit.
+    You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,
+     change the (s)ort order, or (q)uit.
 
     >
 
@@ -92,7 +104,9 @@ you assign your jobs into different numbered regions.  For example, I use
 two regions named (1)Upstairs and (2)Downstairs, and I actually have two cron
 jobs defined, such that I get notified of Upstairs jobs in the morning and
 Downstairs jobs in the afternoon, using `--region=1` and `--region=2`
-respectively.
+respectively.  Specifying a region on the command line also filters the list
+to show only the jobs in that region, and skips the prompt to choose a region
+when adding or editing a job.
 
 All the options can be abbreviated: `-m`, `-t`, `-s`, and `-r=<n>` will work.
 
@@ -100,8 +114,8 @@ All the options can be abbreviated: `-m`, `-t`, `-s`, and `-r=<n>` will work.
 Defining A Job
 --------------
 
-    You may (a)dd a new job, (e)dit an existing job, change the (s)ort order, or
-     (q)uit.
+    You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,
+     change the (s)ort order, or (q)uit.
 
     > a
 
@@ -115,7 +129,7 @@ Defining A Job
     You may rename this region, or press RETURN to confirm the current name.
     [Downstairs]>
 
-    New job name: Clean Bathroom Mirror Downstairs
+    New job name (45 char max): Clean Bathroom Mirror Downstairs
 
     Number of days between updates: 6
 
@@ -143,25 +157,19 @@ Bugs
 ----
 
 No known bugs, just features I haven't added yet.  There's currently no way to
-mark a job as done without being prompted to edit all the details of the job.
-There's currently no way to delete a job or a region, although you can edit it
-to be something completely different.  There's no way to temporarily suspend a
-job except to edit the frequency or increment amount to zero, and then set it
-back to the desired value when you want it to start running again.  There's no
-way to adjust the warning threshold on the fly; it's hardcoded to notify once a
-job's urgency reaches 80%, although only the descriptions of the top two most
-urgent jobs will be printed in the status message.
+delete a job or a region, although you can edit it to be something completely
+different.  There's no way to temporarily suspend a job except to edit the
+frequency or increment amount to zero, and then set it back to the desired
+value when you want it to start running again.  There's no way to adjust the
+warning threshold on the fly; it's hardcoded to notify once a job's urgency
+reaches 80%, although only the descriptions of the top two most urgent jobs
+will be printed in the status message.
 
 The database ships with two regions predefined, Upstairs and Downstairs.  As I
 said above, you can rename them but not delete them from the app.  There's no
 way to turn off the region feature if you don't need it; a job is always
 attached to a region.  Of course, all things are possible if you want to edit
 the script and mess around with sqlite, but you're on your own with that.  :)
-
-I haven't tested this with job names longer than about 40 characters, and the
-status display will probably break if it goes over 60 or so, plus there's the
-140 character limit of Twitter to consider.  I should remember to enforce a
-name length restriction at some point.
 
 There are probably other features that will be obvious to anyone else that I
 just haven't thought of because they don't fit my intended usage of the app.
@@ -189,4 +197,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 8 May 2013_
+_kareila at dreamwidth dot org // 21 May 2013_
