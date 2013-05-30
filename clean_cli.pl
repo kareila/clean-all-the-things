@@ -15,9 +15,11 @@ my $region = 0;  # constrain to a certain region (expects integer id)
 my $silent = 0;  # suppress warnings (e.g. when running out of crontab)
 my $maint  = 0;  # flag indicating maintenance mode (calculate updates and exit)
 my $tconf  = 0;  # flag indicating whether Twitter config info needs to be entered
+my $saynum = 80; # start notifying at 80% or more, unless overridden on the CLI
 
 use Getopt::Long;
-GetOptions( 'twitter' => \$tconf, 'maint' => \$maint, 'silent' => \$silent, 'region=i' => \$region );
+GetOptions( 'twitter' => \$tconf, 'maint' => \$maint, 'silent' => \$silent,
+            'warn=i' => \$saynum, 'region=i' => \$region );
 
 use Storable;
 my $skip_twitter = 0;
@@ -53,11 +55,11 @@ sub reload_jobs {
     return unless @$jobs;  # nothing else will turn up anything useful
     %jobs = map { $_->{jobid} => $_ } @$jobs;
 
-# in maintenance mode, we care about the last time the urgency was incremented.
+# in maintenance mode, we care about the last time the urgency was changed.
 # in user mode, we care about the last time the urgency was decremented (work done).
 
     my $select_timelog = 'SELECT MAX(timestamp) FROM timelog WHERE jobid=? AND percent';
-    $select_timelog .= $maint ? '>=0' : '<=0';
+    $select_timelog .= $maint ? '!=0' : '<=0';
 
     foreach my $job ( @$jobs ) {
         my $jobid = $job->{jobid} or die 'No jobid found!';
@@ -68,6 +70,7 @@ sub reload_jobs {
             @latest = @$last;
         }
         $jobtimes{$jobid} = $latest[0];
+        $jobtimes{$jobid}->{timestamp} = 0 unless $jobtimes{$jobid}->{timestamp};
     }
 
     @jobtimes = sort { $a->{timestamp} <=> $b->{timestamp} } values %jobtimes;
@@ -103,15 +106,15 @@ if ( $maint ) {
         &reload_jobs();
         unless ( $silent ) {
             foreach my $j ( keys %updated ) {
-                warn sprintf( "Job #%d updated to %d%% needed.\n",
-                              $j, $updated{$j} );
+                warn sprintf( "Job #%d updated to %d%% needed. (%s)\n",
+                              $j, $updated{$j}, $jobs{$j}->{jobname} );
             }
             warn "\n";
         }
 
         # figure out top two or three most urgent jobs & notify
-        my @j = grep { $_->{currtotal} >= 80 } @$jobs;
-        return unless @j;  # nothing urgent
+        my @j = grep { $_->{currtotal} >= $saynum } @$jobs;
+        exit 0 unless @j;  # nothing urgent
 
         my $twitter_status = '';
         foreach (0..1) {

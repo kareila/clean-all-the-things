@@ -17,6 +17,22 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 Changes
 -------
 
+### 30 May 2013
+
+New command line option "warn" for changing the warning threshold.  Default
+value is 80% as before.
+
+Update maintenance logic to include both positive and negative changes.
+
+Include job names when printing maintenance update progress.
+
+Fixed a minor bug where a job with a null timestamp could produce uninitialized
+value warnings, by setting a numeric default value of zero.
+
+Fixed a minor bug where exit was needed instead of return, producing a "can't
+return outside a subroutine" warning.
+
+
 ### 21 May 2013
 
 Added a new command 'm' to mark a job as completed without having to look
@@ -95,10 +111,15 @@ account, run `clean_cli.pl --twitter` and follow the configuration instructions.
 This is a one-time configuration option; once configured, Twitter will be
 automatically used for all future status updates.
 
-Two other command line options are available.  The `--silent` flag suppresses
+Three other command line options are available.  The `--silent` flag suppresses
 all those chatty, helpful status messages and prints only the most essential
 output.  (I recommend running `clean_cli.pl --maint --silent` out of cron if
 Twitter is being used, to avoid getting any email unless an error occurs.)
+Specifying `--warn=<n>` on the command line will let you change the warning
+threshold from the default 80% - for example, `--warn=90` will only include
+jobs that have reached 90% urgency or higher in the status message returned
+when running in maintenance mode.
+
 The other command line option is `--region=<n>` which only comes into play if
 you assign your jobs into different numbered regions.  For example, I use
 two regions named (1)Upstairs and (2)Downstairs, and I actually have two cron
@@ -108,7 +129,8 @@ respectively.  Specifying a region on the command line also filters the list
 to show only the jobs in that region, and skips the prompt to choose a region
 when adding or editing a job.
 
-All the options can be abbreviated: `-m`, `-t`, `-s`, and `-r=<n>` will work.
+All the options can be abbreviated: `-m`, `-t`, `-s`, `-w=<n>`, and `-r=<n>`
+will also work.
 
 
 Defining A Job
@@ -160,10 +182,7 @@ No known bugs, just features I haven't added yet.  There's currently no way to
 delete a job or a region, although you can edit it to be something completely
 different.  There's no way to temporarily suspend a job except to edit the
 frequency or increment amount to zero, and then set it back to the desired
-value when you want it to start running again.  There's no way to adjust the
-warning threshold on the fly; it's hardcoded to notify once a job's urgency
-reaches 80%, although only the descriptions of the top two most urgent jobs
-will be printed in the status message.
+value when you want it to start running again.
 
 The database ships with two regions predefined, Upstairs and Downstairs.  As I
 said above, you can rename them but not delete them from the app.  There's no
