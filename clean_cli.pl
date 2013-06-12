@@ -129,10 +129,10 @@ if ( $maint ) {
         if ( $twitter_status && ! $skip_twitter ) {
             warn "Posting to Twitter using stored credentials.\n"
                 unless $silent;
-            use Net::Twitter::Lite;
+            use Net::Twitter::Lite::WithAPIv1_1;
             # "Install Net::OAuth 0.25 or later for OAuth support"
             use Net::OAuth;
-            my $nt = Net::Twitter::Lite->new( %$twitter_info, legacy_lists_api => 0 );
+            my $nt = Net::Twitter::Lite::WithAPIv1_1->new( %$twitter_info );
             eval { $nt->update( $twitter_status ) };
             warn "Twitter error: $@\n" if $@;
         }

@@ -8,14 +8,20 @@ all the things might be found to be reasonably clean at any given time.
 I am a Perl nerd, and I don't expect this software to be used by anyone but
 fellow Perl nerds.  You should at least know how to use CPAN to install the
 requested modules, although you can safely comment out the block containing
-`use Net::Twitter::Lite` if you have no intention of using this app with
-Twitter.
+`use Net::Twitter::Lite::WithAPIv1_1` if you have no intention of using this
+app with Twitter.
 
 This should be considered an alpha release.  Expect falling rocks, etc.
 
 
 Changes
 -------
+
+### 12 Jun 2013
+
+Changed module from Net::Twitter::Lite to Net::Twitter::Lite::WithAPIv1_1,
+because Twitter turned off their 1.0 API.
+
 
 ### 30 May 2013
 
@@ -216,4 +222,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 21 May 2013_
+_kareila at dreamwidth dot org // 12 Jun 2013_
