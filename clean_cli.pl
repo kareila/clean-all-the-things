@@ -35,50 +35,24 @@ if ( $maint && ! defined $twitter_info ) {
         unless $silent;
 }
 
-use DBI;
-my $dbh = DBI->connect( "dbi:SQLite:housework.db" ) || die "Cannot connect: $DBI::errstr";
-my ( @jobs, %jobs, %jobtimes, @jobtimes, %regnames );
+use lib '.';
+use CleanDB;
+my $dbi = CleanDB->new( 'housework.db' );
 
-sub reload_jobs {
-    if ( $_[0] ) {  # optionally populates %regnames
-        my $reg = $dbh->selectall_arrayref( 'SELECT * FROM regions', { Slice => {} } );
-        %regnames = map { $_->{regid} => $_->{regname} } @$reg;
-    }
+# load the job and status info from the database
+my ( @jobs, %jobs, @jobtimes, %jobtimes );
+my $db_load = sub {
+    $dbi->db_load( region => $region, maint => $maint );
+    @jobs = $dbi->jobs_as_list;
+    %jobs = $dbi->jobs_as_hash;
+    @jobtimes = $dbi->jobtimes_as_list;
+    %jobtimes = $dbi->jobtimes_as_hash;
+};
+$db_load->();
 
-    my $select_jobs = 'SELECT * FROM jobs';
-    $select_jobs .= ' WHERE regid=?' if $region;
-    $select_jobs .= ' ORDER BY currtotal DESC';
-    my @sel_job_args = ( $select_jobs, { Slice => {} } );
-    push @sel_job_args, $region if $region;
-
-    @jobs = @{ $dbh->selectall_arrayref( @sel_job_args ) };
-    return unless @jobs;  # nothing else will turn up anything useful
-    %jobs = map { $_->{jobid} => $_ } @jobs;
-
-# in maintenance mode, we care about the last time the urgency was changed.
-# in user mode, we care about the last time the urgency was decremented (work done).
-
-    my $select_timelog = 'SELECT MAX(timestamp) FROM timelog WHERE jobid=? AND percent';
-    $select_timelog .= $maint ? '!=0' : '<=0';
-
-    foreach my $job ( @jobs ) {
-        my $jobid = $job->{jobid} or die 'No jobid found!';
-        my @latest = $dbh->selectrow_array( $select_timelog, undef, $jobid );
-        if ( $latest[0] ) {
-            my $last = $dbh->selectall_arrayref( 'SELECT * FROM timelog WHERE jobid=?'
-                       . ' AND timestamp=?', { Slice => {} }, $jobid, $latest[0] );
-            @latest = @$last;
-        }
-        $jobtimes{$jobid} = $latest[0];
-        $jobtimes{$jobid}->{timestamp} = 0 unless $jobtimes{$jobid}->{timestamp};
-    }
-
-    @jobtimes = sort { $a->{timestamp} <=> $b->{timestamp} } values %jobtimes;
-
-    # this populates the global job variables; nothing to return
-}
-
-&reload_jobs(!$maint);
+# also load region names unless running in maintenance mode
+$dbi->region_load unless $maint;
+my %regnames = $dbi->regions_by_name;
 
 if ( $maint ) {
     exit 0 unless @jobs;  # nothing to do
@@ -94,16 +68,13 @@ if ( $maint ) {
         # plus or minus five minutes...
         if ( time > $jdata->{frequency} * 86100 + $tdata->{timestamp} ) {
             $updated{$id} = $jdata->{currtotal} + $jdata->{urgency};
-            $dbh->do( 'UPDATE jobs SET currtotal=? WHERE jobid=?',
-                      undef, $updated{$id}, $id );
-            $dbh->do( 'INSERT INTO timelog (jobid, timestamp, percent)' .
-                      ' VALUES (?,?,?)', undef, $id, time, $jdata->{urgency} );
-
+            $dbi->job_update_total( $id, $updated{$id} );
+            $dbi->job_timelog( $id, $jdata->{urgency} );
         }
     }
 
     if ( %updated ) {
-        &reload_jobs();
+        $db_load->();
         unless ( $silent ) {
             foreach my $j ( keys %updated ) {
                 warn sprintf( "Job #%d updated to %d%% needed. (%s)\n",
@@ -267,11 +238,9 @@ sub prompt_edit {
         $delta = $p - $job->{currtotal} if defined $job->{currtotal};
         my $continue = &print_prompt( "Reset the urgency of this job to $p%? [Y/N] > " );
         if ( $continue && $continue =~ /^y/i ) {
-            $dbh->do( 'UPDATE jobs SET currtotal=? WHERE jobid=?',
-                      undef, $p, $job->{jobid} );
-            $dbh->do( 'INSERT INTO timelog (jobid, timestamp, percent)' .
-                      ' VALUES (?,?,?)', undef, $job->{jobid}, time, $delta );
-            &reload_jobs();
+            $dbi->job_update_total( $job->{jobid}, $p );
+            $dbi->job_timelog( $job->{jobid}, $delta );
+            $db_load->();
         }
     } else {
         my $continue = &print_prompt( 'Enter new data for this job? [Y/N] > ' );
@@ -308,23 +277,29 @@ sub prompt_add {
 
     my $regid = &prompt_region( $jdata->{regid} );
 
+    my %redefine = ( regid => $regid );
+
     my $append = sub { $_[0] . ( $_[1] ? " \[$_[1]\]" : '' ) . ': ' };
 
     my $jobname = &print_prompt( $append->( "New job name (45 char max)", $jdata->{jobname} ) );
     $jobname = $jdata->{jobname} unless length $jobname;
     return &main_prompt() unless $jobname;
     $jobname = substr( $jobname, 0, 45 );  # truncate names longer than 45 chars
+    $redefine{jobname} = $jobname;
 
     my $freq = &print_prompt( $append->( "Number of days between updates", $jdata->{frequency} ) );
     $freq = $jdata->{frequency} || 0 unless length $freq;
+    $redefine{frequency} = $freq;
 
     my $urg = &print_prompt( $append->( "Increment amount", ( $jdata->{urgency} || 0 ) . '%' ) );
     $urg = $jdata->{urgency} || 0 unless length $urg;
     $urg =~ s/%$// if defined $urg;
+    $redefine{urgency} = $urg;
 
     my $curr = &print_prompt( $append->( "Current urgency", ( $jdata->{currtotal} || 0 ) . '%' ) );
     $curr = $jdata->{currtotal} || 0 unless length $curr;
     $curr =~ s/%$// if defined $curr;
+    $redefine{currtotal} = $curr;
 
     my @lines = (
                  [ 'Job Name', $jobname ],
@@ -341,31 +316,17 @@ sub prompt_add {
     my $continue = &print_prompt( 'Is everything correct? [Y/N] > ' );
     return &main_prompt() if $continue && $continue =~ /^n/i;
 
-    if ( defined $jobid ) {
-        $dbh->do( 'UPDATE jobs SET jobname=?, frequency=?, urgency=?, regid=?, currtotal=?' .
-                  ' WHERE jobid=?', undef, $jobname, $freq, $urg, $regid, $curr, $jobid );
-
-    } elsif ( $jobname && $freq =~ /^\d+$/ && $urg =~ /^\d+$/ && $curr =~ /^-?\d+$/ ) {
-        $dbh->do( 'INSERT INTO jobs (jobname, frequency, urgency, regid, currtotal)' .
-                  ' VALUES (?,?,?,?,?)', undef, $jobname, $freq, $urg, $regid, $curr );
-        ( $jobid ) = $dbh->selectrow_array( 'SELECT jobid FROM jobs WHERE jobname=?',
-                                            undef, $jobname );
-    }
+    $jobid = $dbi->job_redefine( $jobid, %redefine );
 
     if ( $jobid ) {
         my $percent = 0;
         $percent = $curr - $jdata->{currtotal} if defined $jdata->{currtotal};
-        $dbh->do( 'INSERT INTO timelog (jobid, timestamp, percent)' .
-                  ' VALUES (?,?,?)', undef, $jobid, time, $percent );
-        &reload_jobs();
+        $dbi->job_timelog( $jobid, $percent );
+        $db_load->();
         return &print_status;
     }
 
-    # figure out what went wrong
-    warn "Could not save job: no job name given.\n" unless $jobname;
-    warn "Could not save job: invalid frequency.\n" if $freq !~ /^\d+$/;
-    warn "Could not save job: invalid urgency.\n" if $urg !~ /^\d+$/;
-    warn "Could not save job: invalid current total.\n" if $curr !~ /^-?\d+$/;
+    # reprompt if there was an error (jobid not set)
     &main_prompt();
 }
 
@@ -394,11 +355,10 @@ sub prompt_region {
             print "Region names should not be longer than 60 characters.\n\n";
             return &prompt_region( @_ );
         }
-        $dbh->do( 'INSERT INTO regions (regname) VALUES (?)', undef, $newreg );
-        # update %regnames
-        my $reg = $dbh->selectall_arrayref( 'SELECT * FROM regions', { Slice => {} } );
-        %regnames = map { $_->{regid} => $_->{regname} } @$reg;
-        my %regids = map { $_->{regname} => $_->{regid} } @$reg;
+        $dbi->region_new( $newreg );
+        $dbi->region_load;
+        %regnames = $dbi->regions_by_name;
+        my %regids = $dbi->regions_by_id;
         return $regids{$newreg};
 
     } elsif ( $regnames{$regsel} ) {
@@ -424,8 +384,8 @@ sub rename_region {
             print "Region names should not be longer than 60 characters.\n\n";
             return &rename_region( @_ );
         }
-        $dbh->do( 'UPDATE regions SET regname=? WHERE regid=?', undef, $newname, $regid );
-        # update %regnames
+        $dbi->region_rename( $regid, $newname );
+        # update %regnames in place, don't bother reloading
         $regnames{$regid} = $newname;
     } else {
         return $regid;
