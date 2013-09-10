@@ -37,7 +37,7 @@ if ( $maint && ! defined $twitter_info ) {
 
 use DBI;
 my $dbh = DBI->connect( "dbi:SQLite:housework.db" ) || die "Cannot connect: $DBI::errstr";
-my ( $jobs, %jobs, %jobtimes, @jobtimes, %regnames );
+my ( @jobs, %jobs, %jobtimes, @jobtimes, %regnames );
 
 sub reload_jobs {
     if ( $_[0] ) {  # optionally populates %regnames
@@ -51,9 +51,9 @@ sub reload_jobs {
     my @sel_job_args = ( $select_jobs, { Slice => {} } );
     push @sel_job_args, $region if $region;
 
-    $jobs = $dbh->selectall_arrayref( @sel_job_args );
-    return unless @$jobs;  # nothing else will turn up anything useful
-    %jobs = map { $_->{jobid} => $_ } @$jobs;
+    @jobs = @{ $dbh->selectall_arrayref( @sel_job_args ) };
+    return unless @jobs;  # nothing else will turn up anything useful
+    %jobs = map { $_->{jobid} => $_ } @jobs;
 
 # in maintenance mode, we care about the last time the urgency was changed.
 # in user mode, we care about the last time the urgency was decremented (work done).
@@ -61,7 +61,7 @@ sub reload_jobs {
     my $select_timelog = 'SELECT MAX(timestamp) FROM timelog WHERE jobid=? AND percent';
     $select_timelog .= $maint ? '!=0' : '<=0';
 
-    foreach my $job ( @$jobs ) {
+    foreach my $job ( @jobs ) {
         my $jobid = $job->{jobid} or die 'No jobid found!';
         my @latest = $dbh->selectrow_array( $select_timelog, undef, $jobid );
         if ( $latest[0] ) {
@@ -81,7 +81,7 @@ sub reload_jobs {
 &reload_jobs(!$maint);
 
 if ( $maint ) {
-    exit 0 unless @$jobs;  # nothing to do
+    exit 0 unless @jobs;  # nothing to do
     my %updated;
 
     # update urgencies as needed
@@ -113,7 +113,7 @@ if ( $maint ) {
         }
 
         # figure out top two or three most urgent jobs & notify
-        my @j = grep { $_->{currtotal} >= $saynum } @$jobs;
+        my @j = grep { $_->{currtotal} >= $saynum } @jobs;
         exit 0 unless @j;  # nothing urgent
 
         my $twitter_status = '';
@@ -193,9 +193,9 @@ my %jsort = ( '0' => 'most needed', '1' => 'least recent' );
 
 sub print_status {
     warn "More than $limit matching jobs found; only displaying top $limit.\n"
-        if !$silent and scalar @$jobs > $limit;
-    printf "%d jobs found, sorted by %s first.\n\n", scalar @$jobs, $jsort{$jsort};
-    my @print_jobs = $jsort ? @jobtimes : @$jobs;
+        if !$silent and scalar @jobs > $limit;
+    printf "%d jobs found, sorted by %s first.\n\n", scalar @jobs, $jsort{$jsort};
+    my @print_jobs = $jsort ? @jobtimes : @jobs;
     my $i = 1;
     foreach my $j ( @print_jobs ) {
         my $id = $j->{jobid};
@@ -253,7 +253,7 @@ sub prompt_edit {
     }
     my $j = $args[0];
     exit 0 if $j eq 'q';
-    my @print_jobs = $jsort ? @jobtimes : @$jobs;
+    my @print_jobs = $jsort ? @jobtimes : @jobs;
     my $job = $print_jobs[$j-1];
     if ( $j !~ /^\d+$/ or $j > $limit or $j < 1 or ! $job->{jobid} ) {
         print "Sorry, I can't find that job.\n";
