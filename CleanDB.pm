@@ -138,6 +138,13 @@ sub job_timelog {
 			  ' VALUES (?,?,?)', undef, $id, time, $percent );
 }
 
+sub job_delete {
+	my ( $self, $id ) = @_;
+	my $dbh = $self->{db} or die "Database error: DBI handle not found";
+	$dbh->do( 'DELETE FROM timelog WHERE jobid=?', undef, $id );
+	$dbh->do( 'DELETE FROM jobs WHERE jobid=?', undef, $id );
+}
+
 sub job_redefine {
 	my ( $self, $jobid, %data ) = @_;
 	my $dbh = $self->{db} or die "Database error: DBI handle not found";

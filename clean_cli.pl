@@ -121,6 +121,7 @@ if ( $maint ) {
 
 use Term::ReadLine;
 my $term = new Term::ReadLine;
+$term->MinLine(2);  # omit single characters from input history
 
 warn "Welcome to the Clean All The Things configuration interface.\n\n" .
      "To run this script in maintenance mode, which notes the current time and\n" .
@@ -243,8 +244,15 @@ sub prompt_edit {
             $db_load->();
         }
     } else {
-        my $continue = &print_prompt( 'Enter new data for this job? [Y/N] > ' );
+        my $continue = &print_prompt( 'Enter new data for this job (or D for delete)? [Y/N/D] > ' );
         return &prompt_add( $job->{jobid} ) if $continue && $continue =~ /^y/i;
+        return &main_prompt() unless $continue && $continue =~ /^d/i;
+
+        $continue = &print_prompt( "Are you SURE you want to permanently delete this job? [Y/N] > " );
+        if ( $continue && $continue =~ /^y/i ) {
+            $dbi->job_delete( $job->{jobid} );
+            $db_load->();
+        }
     }
     &print_status;
 }
