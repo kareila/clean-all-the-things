@@ -2,7 +2,7 @@ Clean All The Things
 ====================
 
 This software does not, alas, clean all the things.  However, it is useful
-for helping one focus on which items are most in need of cleaning, so that
+for helping one focus on which items are most in need of attention, so that
 all the things might be found to be reasonably clean at any given time.
 
 I am a Perl nerd, and I don't expect this software to be used by anyone but
@@ -16,6 +16,18 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 
 Changes
 -------
+
+### 13 Sep 2013
+
+Added a new command 'r' to manage region names (add/delete/rename).
+
+Refactored database subroutines into a separate module to share code with
+a planned web interface.
+
+Added an option to the job edit workflow to allow job deletion.
+
+Removed single characters (e.g. Y/N confirmation prompts) from command history.
+
 
 ### 12 Jun 2013
 
@@ -61,13 +73,14 @@ Overview
 
 This distribution should contain the following files:
 
+- `CleanDB.pm`   (code module that interfaces with the database)
 - `README.md`    (these instructions)
 - `clean_cli.pl` (command line interface)
 - `housework.db` (a SQLite database)
 
 Running `clean_cli.pl` will give you command line access to job status and
 the ability to add new jobs or edit existing jobs.  It expects `housework.db`
-to be in the same directory as itself, so keep them together.
+and `CleanDB.pm` to be in the same directory as itself, so keep them together.
 
 The only other filesystem assumption is the existence of a .ssh directory in
 the user's home directory.  If the script is configured to post status updates
@@ -76,11 +89,9 @@ hash in `$HOME/.ssh/.cleanthings` with user-read-only (600) permissions.  You
 can change this location if you want by editing the value of `$twitter_file`
 in `clean_cli.pl`.
 
-In the near future I hope to add a subdirectory of webpages providing a
-more generally accessible interface to the database, and I'll probably have
-to program it in PHP.  (I'm sorry.)  But you'll still want the command line
-script to run out of cron to do regular maintenance on the database, as
-described below.
+In the near future I hope to add a more generally accessible web interface to
+the database, but you'll still want the command line script to run out of cron
+to do regular maintenance on the database, as described below.
 
 
 Usage
@@ -105,7 +116,7 @@ example output:
     11: Clean Microwave                                              (0%)
 
     You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,
-     change the (s)ort order, or (q)uit.
+     change the (s)ort order, modify a (r)egion, or (q)uit.
 
     >
 
@@ -133,7 +144,12 @@ jobs defined, such that I get notified of Upstairs jobs in the morning and
 Downstairs jobs in the afternoon, using `--region=1` and `--region=2`
 respectively.  Specifying a region on the command line also filters the list
 to show only the jobs in that region, and skips the prompt to choose a region
-when adding or editing a job.
+when adding or editing a job.  If you don't want to assign jobs to different
+areas, you might want to use this option to assign tasks to different members
+of your household.  There's no way to turn off the region feature completely;
+deleting all the regions will leave all jobs assigned to a single region named
+`*UNASSIGNED*`.  The database ships with two regions predefined, which are
+Upstairs and Downstairs.
 
 All the options can be abbreviated: `-m`, `-t`, `-s`, `-w=<n>`, and `-r=<n>`
 will also work.
@@ -143,7 +159,7 @@ Defining A Job
 --------------
 
     You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,
-     change the (s)ort order, or (q)uit.
+     change the (s)ort order, modify a (r)egion, or (q)uit.
 
     > a
 
@@ -153,9 +169,6 @@ Defining A Job
 
     Enter your choice - 1, 2, or 'n' for new region.
     [n]> 2
-
-    You may rename this region, or press RETURN to confirm the current name.
-    [Downstairs]>
 
     New job name (45 char max): Clean Bathroom Mirror Downstairs
 
@@ -184,17 +197,14 @@ power of math!)
 Bugs
 ----
 
-No known bugs, just features I haven't added yet.  There's currently no way to
-delete a job or a region, although you can edit it to be something completely
-different.  There's no way to temporarily suspend a job except to edit the
-frequency or increment amount to zero, and then set it back to the desired
-value when you want it to start running again.
+No known bugs, just features I haven't added yet.  There's no way to temporarily
+suspend a job except to edit the frequency or increment amount to zero, and then
+set it back to the desired value when you want it to start running again.
 
-The database ships with two regions predefined, Upstairs and Downstairs.  As I
-said above, you can rename them but not delete them from the app.  There's no
-way to turn off the region feature if you don't need it; a job is always
-attached to a region.  Of course, all things are possible if you want to edit
-the script and mess around with sqlite, but you're on your own with that.  :)
+A web interface is in development.  It may not initially offer all the features
+of the command line interface.  The CLI script will still need to be scheduled to
+run in maintenance mode to keep job statuses up to date, even if using the web
+interface exclusively to assign and track tasks.
 
 There are probably other features that will be obvious to anyone else that I
 just haven't thought of because they don't fit my intended usage of the app.
@@ -222,4 +232,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 12 Jun 2013_
+_kareila at dreamwidth dot org // 13 Sep 2013_

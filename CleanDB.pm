@@ -102,6 +102,7 @@ sub regions_by_name {
 	my ( $self ) = @_;
 	my $reg = $self->{regions};
 	return unless defined $reg and @$reg;
+	push @$reg, { regid => 0, regname => '*UNASSIGNED*' };
     return map { $_->{regid} => $_->{regname} } @$reg;  # %regnames
 }
 
@@ -122,6 +123,15 @@ sub region_rename {
 	my ( $self, $id, $name ) = @_;
 	my $dbh = $self->{db} or die "Database error: DBI handle not found";
 	$dbh->do( 'UPDATE regions SET regname=? WHERE regid=?', undef, $name, $id );
+}
+
+sub region_delete {
+	my ( $self, $oldid, $newid ) = @_;
+	my $dbh = $self->{db} or die "Database error: DBI handle not found";
+	$dbh->do( 'DELETE FROM regions WHERE regid=?', undef, $oldid );
+	$newid ||= 0;
+	$dbh->do( 'UPDATE jobs SET regid=? WHERE regid=?',
+			  undef, $newid, $oldid );
 }
 
 sub job_update_total {
@@ -151,7 +161,7 @@ sub job_redefine {
 	my $warn = sub { warn "Could not save job: $_[0].\n"; return 1 };
 
 	my $regid = $data{regid};
-    $warn->( "no region specified" ) and return unless $regid;
+    $regid += 0;  # assign to the "UNASSIGNED" region by default
 
 	my $jobname = $data{jobname};
     $warn->( "no job name given" ) and return unless $jobname;

@@ -39,6 +39,13 @@ use lib '.';
 use CleanDB;
 my $dbi = CleanDB->new( 'housework.db' );
 
+# load region names
+$dbi->region_load;
+my %regnames = $dbi->regions_by_name;
+
+die "Invalid region $region specified; cannot continue.\n"
+    if $region && ! $regnames{$region};
+
 # load the job and status info from the database
 my ( @jobs, %jobs, @jobtimes, %jobtimes );
 my $db_load = sub {
@@ -49,10 +56,6 @@ my $db_load = sub {
     %jobtimes = $dbi->jobtimes_as_hash;
 };
 $db_load->();
-
-# also load region names unless running in maintenance mode
-$dbi->region_load unless $maint;
-my %regnames = $dbi->regions_by_name;
 
 if ( $maint ) {
     exit 0 unless @jobs;  # nothing to do
@@ -167,6 +170,8 @@ sub print_status {
     warn "More than $limit matching jobs found; only displaying top $limit.\n"
         if !$silent and scalar @jobs > $limit;
     printf "%d jobs found, sorted by %s first.\n\n", scalar @jobs, $jsort{$jsort};
+    warn "Showing only jobs assigned to $regnames{$region}.\n\n"
+        if !$silent and $region;
     my @print_jobs = $jsort ? @jobtimes : @jobs;
     my $i = 1;
     foreach my $j ( @print_jobs ) {
@@ -181,22 +186,12 @@ sub print_status {
 }
 
 sub main_prompt {
-    print "You may (a)dd a new job, (e)dit an existing job, (m)ark a job completed,\n change the (s)ort order, or (q)uit.\n\n";
+    print "You may (a)dd a new job, (e)dit an existing job, "
+        . "(m)ark a job completed,\n change the (s)ort order, "
+        . "modify a (r)egion, or (q)uit.\n\n";
+
     my $input = &print_prompt();
-    &parse_input($input);
-}
-
-sub print_prompt {
-    my $prompt = defined $_[0] && length $_[0] ? $_[0] : "> ";
-    my $input = $term->readline($prompt);
-    chomp $input;
-    print "\n";
-    return $input;
-}
-
-sub parse_input {
-    my $input = $_[0];
-    my ($c, @args) = split /\s+/, $input;
+    my ( $c, @args ) = split /\s+/, $input;
     return &main_prompt() unless defined $c and length $c;
 
     if ( $c =~ /^s/ ) { # change the sort order
@@ -210,10 +205,20 @@ sub parse_input {
         return &prompt_edit( @args );
     } elsif ( $c =~ /^m/ ) {
         return &prompt_edit( @args, 0 );
+    } elsif ( $c =~ /^r/ ) {
+        return &manage_regions();
     } else {
         print "Sorry, I don't know what you mean by that.\n";
         return &main_prompt();
     }
+}
+
+sub print_prompt {
+    my $prompt = defined $_[0] && length $_[0] ? $_[0] : "> ";
+    my $input = $term->readline($prompt);
+    chomp $input;
+    print "\n";
+    return $input;
 }
 
 sub prompt_edit {
@@ -283,7 +288,8 @@ sub prompt_add {
     my ( $jobid ) = @_;
     my $jdata = defined $jobid ? $jobs{$jobid} : {};
 
-    my $regid = &prompt_region( $jdata->{regid} );
+    my $regid = &prompt_region( $jdata->{regid}, 1 );
+    return &main_prompt() unless $regnames{$regid};
 
     my %redefine = ( regid => $regid );
 
@@ -322,7 +328,7 @@ sub prompt_add {
     }
     print "\nIf everything is correct, press Y to continue, or N to abort changes.\n";
     my $continue = &print_prompt( 'Is everything correct? [Y/N] > ' );
-    return &main_prompt() if $continue && $continue =~ /^n/i;
+    return &print_status if $continue && $continue =~ /^n/i;
 
     $jobid = $dbi->job_redefine( $jobid, %redefine );
 
@@ -338,20 +344,34 @@ sub prompt_add {
     &main_prompt();
 }
 
-sub prompt_region {
-    my ( $regid ) = @_;
-    my $regp = $regid // 'n';
-
-    return $regid || $region if $region and $regnames{$region}; # constrained
-
-    print "Currently defined regions:\n";
+sub list_regions {
+    my ( $new_allowed ) = @_;
+    return "There are no regions currently defined.\n\n" .
+        "Enter 'n' to add a new region, or 'q' to return to the main menu.\n"
+            unless %regnames;
+    my $ret = "Currently defined regions:\n";
     my $rlist = 'Enter your choice -';
     foreach my $r ( sort keys %regnames ) {
-        printf " %2s: %s\n", $r, $regnames{$r};
+        next unless $r;
+        $ret .= sprintf " %2s: %s\n", $r, $regnames{$r};
         $rlist .= " $r,";
     }
-    print "\n$rlist or 'n' for new region.\n";
-    my $regsel = &print_prompt( "[$regp]> " ) || $regp;
+    $rlist .= " or 'n' for new region" if $new_allowed;
+    $ret .= "\n$rlist.\n";
+    return $ret;
+}
+
+sub prompt_region {
+    my ( $regid, $from_jobadd ) = @_;
+    my $regp = $regid || 'n';
+
+    return $regid || $region
+        if $region and $regnames{$region} and $from_jobadd; # constrained
+
+    print &list_regions(1);
+    my $regsel = &print_prompt( "[$regp]> " );
+    $regsel = $regp if ! defined $regsel || $regsel eq '';
+    return if $regsel =~ /^q/i;
 
     if ( $regsel =~ /^n/i ) {
         my $newreg = &print_prompt( "New region name: " );
@@ -369,35 +389,85 @@ sub prompt_region {
         my %regids = $dbi->regions_by_id;
         return $regids{$newreg};
 
-    } elsif ( $regnames{$regsel} ) {
-        return &rename_region( $regsel );
+    } elsif ( defined $regsel && $regnames{$regsel} ) {
+        return $regsel if $from_jobadd || $regsel == 0;
+        return &delete_region( $regsel );
     } else {
         print "That is not a valid region ID.\n\n";
         &prompt_region( @_ );
     }
 }
 
+sub manage_regions {
+    my $regid = &prompt_region( $region, 0 );
+    $region = $regid if $region && defined $regid;
+    &print_status;
+}
+
+sub delete_region {
+    my ( $regid ) = @_;
+    return unless $regid;
+    print "Current region is $regnames{$regid}.\n\n";
+    my $newreg = 0;
+
+    my @regjobs = grep { $_->{regid} == $regid } @jobs;
+
+    if ( @regjobs ) {
+        printf "There are %d jobs assigned to this region.\n\n", scalar @regjobs;
+        my $i = 1;
+        foreach my $j ( @regjobs ) {
+            my $id = $j->{jobid};
+            my $stat = strftime( "%D", localtime( $jobtimes{$id}->{timestamp} ) );
+            printf "%02d: %-60s (%s)\n", $i++, $jobs{$id}->{jobname}, $stat;
+        }
+        print "\n";
+    }
+
+    my $continue = &print_prompt( 'Do you want to delete this region? [Y/N] > ' );
+    return &rename_region( $regid ) unless $continue && $continue =~ /^y/i;
+
+    if ( @regjobs ) {
+        print "Please reassign the jobs in the region you want to delete.\n\n";
+        print &list_regions(0);
+        while ( ! $regnames{$newreg} ) {
+            $newreg = &print_prompt( "Enter region number: " ) || 0;
+            print "That is not a valid region ID.\n" unless $regnames{$newreg};
+        }
+        print "Jobs will be reassigned from $regnames{$regid} to $regnames{$newreg}.\n\n";
+    }
+
+    $continue = &print_prompt( "Are you SURE you want to permanently delete this region? [Y/N] > " );
+    return $regid unless $continue && $continue =~ /^y/i;
+
+    $dbi->region_delete( $regid, $newreg );
+    $region = $newreg if $region && $region == $regid;
+    $dbi->region_load;
+    %regnames = $dbi->regions_by_name;
+    $db_load->();
+    return $newreg;
+}
+
 sub rename_region {
     my ( $regid ) = @_;
-    return unless defined $regid;
+    return unless $regid;
 
     print "You may rename this region, or press RETURN to confirm the current name.\n";
     my $newname = &print_prompt( "[$regnames{$regid}]> " );
-    if ( defined $newname and length $newname ) {
-        unless ( &is_unique_regname( $newname ) || lc $newname eq lc $regnames{$regid} ) {
-            print "There is already a region with that name.\n\n";
-            return &rename_region( @_ );
-        }
-        if ( length $newname > 60 ) {
-            print "Region names should not be longer than 60 characters.\n\n";
-            return &rename_region( @_ );
-        }
-        $dbi->region_rename( $regid, $newname );
-        # update %regnames in place, don't bother reloading
-        $regnames{$regid} = $newname;
-    } else {
-        return $regid;
+    return $regid unless defined $newname and length $newname;
+
+    unless ( &is_unique_regname( $newname ) || lc $newname eq lc $regnames{$regid} ) {
+        print "There is already a region with that name.\n\n";
+        return &rename_region( @_ );
     }
+    if ( length $newname > 60 ) {
+        print "Region names should not be longer than 60 characters.\n\n";
+        return &rename_region( @_ );
+    }
+    $dbi->region_rename( $regid, $newname );
+    # update %regnames in place, don't bother reloading since regid is same
+    $regnames{$regid} = $newname;
+    print "New region name is $newname.\n\n";
+
     # keep prompting until they accept the name
     &rename_region( @_ );
 }
