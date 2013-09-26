@@ -1,0 +1,29 @@
+<html>
+<head>
+<title><% title %></title>
+<style type="text/css">
+    ol li { padding: 0.25em; }
+    li.even { background-color: lavender; }
+</style>
+</head>
+
+<body>
+<h1><% title %></h1>
+
+<form action="/" method=post>
+
+<ol>
+<% FOREACH job IN joblist %>
+    <li class=<% loop.parity %>>
+        <% job.jobname %> &nbsp;&nbsp;
+        <input type=text size=3 name=curr_<% job.jobid %> value=<% job.currtotal %>>%
+        <input type=hidden name=prev_<% job.jobid %> value=<% job.currtotal %>>
+    </li>
+<% END %>
+</ol>
+
+<input type=submit value="Save Changes">
+</form>
+
+</body>
+</html>

@@ -17,6 +17,14 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 Changes
 -------
 
+### 26 Sep 2013
+
+Includes a simple web service for updating percentages.  To get it working,
+just run websrv.pl and point your browser at localhost:3000.  You will need
+to install the Dancer and Template modules from CPAN if you don't already have
+them.  The new views/ subdirectory contains the page templates.
+
+
 ### 13 Sep 2013
 
 Added a new command 'r' to manage region names (add/delete/rename).
@@ -77,10 +85,14 @@ This distribution should contain the following files:
 - `README.md`    (these instructions)
 - `clean_cli.pl` (command line interface)
 - `housework.db` (a SQLite database)
+- `views/`       (subdirectory for web page templates)
+- `websrv.pl`    (server for web interface)
 
 Running `clean_cli.pl` will give you command line access to job status and
 the ability to add new jobs or edit existing jobs.  It expects `housework.db`
 and `CleanDB.pm` to be in the same directory as itself, so keep them together.
+Running `websrv.pl` will start a daemon which listens for HTTP connections
+on port 3000 and responds with a simple form for editing job percentages.
 
 The only other filesystem assumption is the existence of a .ssh directory in
 the user's home directory.  If the script is configured to post status updates
@@ -89,9 +101,9 @@ hash in `$HOME/.ssh/.cleanthings` with user-read-only (600) permissions.  You
 can change this location if you want by editing the value of `$twitter_file`
 in `clean_cli.pl`.
 
-In the near future I hope to add a more generally accessible web interface to
-the database, but you'll still want the command line script to run out of cron
-to do regular maintenance on the database, as described below.
+Even if you primarily interact with the database through the web interface,
+you'll still want the command line script to run out of cron to do regular
+maintenance on the database, as described below.
 
 
 Usage
@@ -201,10 +213,17 @@ No known bugs, just features I haven't added yet.  There's no way to temporarily
 suspend a job except to edit the frequency or increment amount to zero, and then
 set it back to the desired value when you want it to start running again.
 
-A web interface is in development.  It may not initially offer all the features
-of the command line interface.  The CLI script will still need to be scheduled to
-run in maintenance mode to keep job statuses up to date, even if using the web
-interface exclusively to assign and track tasks.
+The web interface is very basic.  I included some simple checks for concurrent
+access, but it is not protected by any sort of user authentication.  You should
+still use the command line interface to add, delete, or edit job details.  Also,
+the CLI script will still need to be scheduled to run in maintenance mode to
+keep job statuses up to date, even if using the web interface exclusively for
+monitoring and updating tasks.
+
+I believe that the command line script assumes exclusive database access, and
+will need to be updated to avoid concurrency issues if another user accesses
+the database via the web at the same time.  To avoid unpleasant surprises, I
+would recommend suspending `websrv.pl` while using `clean_cli.pl`.
 
 There are probably other features that will be obvious to anyone else that I
 just haven't thought of because they don't fit my intended usage of the app.
@@ -232,4 +251,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 13 Sep 2013_
+_kareila at dreamwidth dot org // 26 Sep 2013_

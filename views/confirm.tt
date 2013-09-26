@@ -1,0 +1,35 @@
+<html>
+<head>
+<title><% title %></title>
+<style type="text/css">
+    ul li { padding: 0.25em; }
+</style>
+</head>
+
+<body>
+<h1><% title %></h1>
+
+<p>Some totals appear to have been altered.  Please confirm the changes below.</p>
+
+<form action="/" method=post>
+
+<ul>
+<% FOREACH id IN unsynced.keys; IF unsynced.$id != changes.$id %>
+    <li>
+        <% jobhash.$id.jobname %> changed from <% unsynced.$id %>% to <% changes.$id %>%
+        <input type=hidden name=curr_<% id %> value=<% changes.$id %>>
+        <input type=hidden name=prev_<% id %> value=<% unsynced.$id %>>
+    </li>
+<% END; END %>
+</ul>
+
+<% FOREACH id IN changes.keys; UNLESS unsynced.exists("$id") %>
+<input type=hidden name=curr_<% id %> value=<% changes.$id %>>
+<input type=hidden name=prev_<% id %> value=<% jobhash.$id.currtotal %>>
+<% END; END %>
+
+<input type=submit value="Confirm">
+</form>
+
+</body>
+</html>
