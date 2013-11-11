@@ -13,11 +13,11 @@
 <form action="/" method=post>
 
 <ol>
-<% FOREACH job IN joblist %>
+<% FOREACH job IN joblist; jobid = job.jobid; %>
     <li class=<% loop.parity %>>
-        <% job.jobname %> &nbsp;&nbsp;
-        <input type=text size=3 name=curr_<% job.jobid %> value=<% job.currtotal %>>%
-        <input type=hidden name=prev_<% job.jobid %> value=<% job.currtotal %>>
+        [<% regions.$jobid %>] <% job.jobname %> &nbsp;&nbsp;
+        <input type=text size=3 name=curr_<% jobid %> value=<% job.currtotal %>>%
+        <input type=hidden name=prev_<% jobid %> value=<% job.currtotal %>>
     </li>
 <% END %>
 </ol>

@@ -17,6 +17,14 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 Changes
 -------
 
+### 11 Nov 2013
+
+Print region names in addition to job names when viewing all regions, to
+avoid confusion with similarly named jobs assigned to different regions.
+This may cause display width issues with very long names when using the CLI
+interface; I don't anticipate such problems when using the web interface.
+
+
 ### 26 Sep 2013
 
 Includes a simple web service for updating percentages.  To get it working,
@@ -251,4 +259,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 26 Sep 2013_
+_kareila at dreamwidth dot org // 11 Nov 2013_

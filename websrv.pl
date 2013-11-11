@@ -26,6 +26,10 @@ any ['get', 'post'] => '/' => sub {
     # the database after the page is rendered
     my $dbi = CleanDB->new( 'housework.db' );
     $dbi->db_load();
+    $dbi->region_load();
+    my %regnames = $dbi->regions_by_name;
+    my %regions = map { $_->{jobid} => $regnames{ $_->{regid} } }
+                      $dbi->jobs_as_list;
 
     if ( request->method() eq "POST" ) {
         my ( %changes, %deltas, %unsynced );
@@ -48,6 +52,7 @@ any ['get', 'post'] => '/' => sub {
             return template 'confirm.tt', {
                 title    => "Confirm Changes",
                 jobhash  => { $dbi->jobs_as_hash },
+                regions  => \%regions,
                 changes  => \%changes,
                 unsynced => \%unsynced,
             };
@@ -65,6 +70,7 @@ any ['get', 'post'] => '/' => sub {
     template 'index.tt', {
         title   => "Clean All The Things!",
         joblist => [ $dbi->jobs_as_list ],
+        regions  => \%regions,
     };
 };
 

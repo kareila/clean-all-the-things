@@ -16,7 +16,7 @@
 <ul>
 <% FOREACH id IN unsynced.keys; IF unsynced.$id != changes.$id %>
     <li>
-        <% jobhash.$id.jobname %> changed from <% unsynced.$id %>% to <% changes.$id %>%
+        [<% regions.$id %>] <% jobhash.$id.jobname %> changed from <% unsynced.$id %>% to <% changes.$id %>%
         <input type=hidden name=curr_<% id %> value=<% changes.$id %>>
         <input type=hidden name=prev_<% id %> value=<% unsynced.$id %>>
     </li>

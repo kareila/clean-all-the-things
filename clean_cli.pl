@@ -178,7 +178,9 @@ sub print_status {
         my $id = $j->{jobid};
         my $stat = $jsort ? strftime( "%D", localtime( $jobtimes{$id}->{timestamp} ) )
                           : $j->{currtotal} . '%';
-        printf "%02d: %-60s (%s)\n", $i, $jobs{$id}->{jobname}, $stat;
+        my $reg_prefix = '[' . $regnames{ $jobs{$id}->{regid} } . '] ';
+        $reg_prefix = '' if $region or ! $jobs{$id}->{regid};
+        printf "%02d: %-60s (%s)\n", $i, $reg_prefix . $jobs{$id}->{jobname}, $stat;
         last if ++$i > $limit;
     }
     print "\n";
