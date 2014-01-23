@@ -17,6 +17,13 @@ This should be considered an alpha release.  Expect falling rocks, etc.
 Changes
 -------
 
+### 23 Jan 2014
+
+Twitter now requires SSL connections to be used.  Relies on the Mozilla::CA
+module for certificate authority, which should be installed by default on most
+systems.
+
+
 ### 11 Nov 2013
 
 Print region names in addition to job names when viewing all regions, to
@@ -259,4 +266,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 11 Nov 2013_
+_kareila at dreamwidth dot org // 23 Jan 2014_

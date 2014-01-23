@@ -28,6 +28,8 @@ my $twitter_info;
 
 # check for saved Twitter auth info
 $twitter_info = Storable::retrieve $twitter_file if -f $twitter_file;
+# turn on SSL for Twitter if info was loaded
+$twitter_info->{ssl} = 1 if defined $twitter_info;
 
 if ( $maint && ! defined $twitter_info ) {
     $skip_twitter = 1;
@@ -106,6 +108,9 @@ if ( $maint ) {
             use Net::Twitter::Lite::WithAPIv1_1;
             # "Install Net::OAuth 0.25 or later for OAuth support"
             use Net::OAuth;
+            # as of Jan 2014 this is required for SSL certs
+            use Mozilla::CA;
+
             my $nt = Net::Twitter::Lite::WithAPIv1_1->new( %$twitter_info );
             eval { $nt->update( $twitter_status ) };
             warn "Twitter error: $@\n" if $@;
