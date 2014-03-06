@@ -28,6 +28,7 @@
 <input type=hidden name=prev_<% id %> value=<% jobhash.$id.currtotal %>>
 <% END; END %>
 
+<input type=hidden name=show value=<% regview | url %>>
 <input type=submit value="Confirm">
 </form>
 

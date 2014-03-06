@@ -1,0 +1,40 @@
+// adapted from http://www.w3.org/Style/Examples/007/target.en.html
+
+div.tabs {
+  line-height: 1;				/* Easier to calculate with */
+  z-index: 0;  					/* So that we can put other things behind */
+  border-bottom: 0.4em solid #eee;
+}
+
+div.tabs > div {
+  display: inline;				/* We want the buttons all on one line */
+}
+
+div.tabs > div > a {
+  color: black;					/* Looks more like a button than a link */
+  background: #eee;				/* Active tabs are light gray */
+  padding: 0.2em;				/* Some breathing space */
+  border: 0.1em outset #BBB;  	/* Make it look like a button */
+  border-bottom: 0.1em solid #ccc; /* Visually connect tab and tab body */
+  border-top-left-radius:       10px;
+  border-top-right-radius:      10px;
+  -moz-border-top-left-radius:  10px;
+  -moz-border-top-right-radius: 10px;
+}
+
+div.tabs > div:not(.active) > a {
+  border-bottom: none;			/* Make the bottom border disappear */
+  background: #eee;				/* Inactive tabs are dark gray */
+}
+
+div.tabs > div.active > a {		/* Apply to the targeted or default item */
+  background: #ccc;	 			/* Active tab is light gray */
+}
+
+div.tabs > div:not(.active) > div { /* Protect CSS1 & CSS2 browsers */
+  position: absolute;			/* All these DIVs overlap */
+}
+
+div.tabs .active {
+  outline: none;
+}

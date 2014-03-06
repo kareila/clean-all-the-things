@@ -1,27 +1,43 @@
 <html>
 <head>
 <title><% title %></title>
+<link rel="stylesheet" href="tabs.css" />
 <style type="text/css">
     ol li { padding: 0.25em; }
     li.even { background-color: lavender; }
+
+    div.tabs { border-bottom: 0.4em solid #eee; } /* only works here? */
 </style>
 </head>
 
 <body>
 <h1><% title %></h1>
 
+<div class="tabs">
+
+     <div class="<% IF ! regview; "active"; END %>"> <a href="/">
+     List All</a></div>
+
+<%- FOREACH region IN regnames; IF region.key; %>
+     <div class="<% IF regview == region.key; "active"; END %>"> <a href="/?show=<% region.key | url %>">
+     <% region.value | html %></a></div>
+<% END; END -%>
+
+</div>
+
 <form action="/" method=post>
 
 <ol>
 <% FOREACH job IN joblist; jobid = job.jobid; %>
     <li class=<% loop.parity %>>
-        [<% regions.$jobid %>] <% job.jobname %> &nbsp;&nbsp;
+        <% IF ! regview %>[<% regions.$jobid %>] <% END; job.jobname %> &nbsp;&nbsp;
         <input type=text size=3 name=curr_<% jobid %> value=<% job.currtotal %>>%
         <input type=hidden name=prev_<% jobid %> value=<% job.currtotal %>>
     </li>
 <% END %>
 </ol>
 
+<input type=hidden name=show value=<% regview | url %>>
 <input type=submit value="Save Changes">
 </form>
 

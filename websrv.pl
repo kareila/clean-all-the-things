@@ -31,6 +31,9 @@ any ['get', 'post'] => '/' => sub {
     my %regions = map { $_->{jobid} => $regnames{ $_->{regid} } }
                       $dbi->jobs_as_list;
 
+    my $regview = params->{"show"};
+    $regview = '' unless $regview && $regnames{$regview};
+
     if ( request->method() eq "POST" ) {
         my ( %changes, %deltas, %unsynced );
 
@@ -51,6 +54,7 @@ any ['get', 'post'] => '/' => sub {
         if ( %unsynced ) {
             return template 'confirm.tt', {
                 title    => "Confirm Changes",
+                regview  => $regview,
                 jobhash  => { $dbi->jobs_as_hash },
                 regions  => \%regions,
                 changes  => \%changes,
@@ -67,10 +71,16 @@ any ['get', 'post'] => '/' => sub {
         $dbi->db_load() if %changes;
     }
 
+    # filter by desired region if needed
+    my @joblist = $dbi->jobs_as_list;
+    @joblist = grep { $_->{regid} == $regview } @joblist if $regview;
+
     template 'index.tt', {
         title   => "Clean All The Things!",
-        joblist => [ $dbi->jobs_as_list ],
+        regview => $regview,
+        joblist => \@joblist,
         regions  => \%regions,
+        regnames => \%regnames,
     };
 };
 
