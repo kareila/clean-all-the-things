@@ -20,6 +20,11 @@ set log      => 'warning';
 
 use lib '.';
 use CleanDB;
+use SimpleTweet;
+
+# uncomment the line below to turn off Twitter posting
+# sub can_tweet { return 0 }  # <--- falls through to SimpleTweet if omitted
+# uncomment the line above to turn off Twitter posting
 
 any ['get', 'post'] => '/' => sub {
     # locally scoping $dbi here should release the file lock on
@@ -39,7 +44,7 @@ any ['get', 'post'] => '/' => sub {
 
         foreach my $job ( $dbi->jobs_as_list ) {
             my $id = $job->{jobid};
-            my $currval = $job->{currtotal};
+            my $currval = $job->{currtotal} // 0;
             my $oldval = params->{"prev_$id"};
             my $newval = params->{"curr_$id"};
             next unless defined $newval;
@@ -60,6 +65,19 @@ any ['get', 'post'] => '/' => sub {
                 changes  => \%changes,
                 unsynced => \%unsynced,
             };
+        }
+
+        if ( can_tweet() ) {
+            foreach my $job ( $dbi->jobs_as_list ) {
+                next unless exists $changes{ $job->{jobid} };
+                my $twitter_status = '';
+                $twitter_status = '[' . $regnames{ $job->{regid} } . '] '
+                    if $job->{regid};
+                $twitter_status .= $job->{jobname} . " changed from ";
+                $twitter_status .= $job->{currtotal} // 0;
+                $twitter_status .= "% to " . $changes{ $job->{jobid} } . "%.";
+                SimpleTweet::tweet( $twitter_status );
+            }
         }
 
         foreach my $id ( keys %changes ) {

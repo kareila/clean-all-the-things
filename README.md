@@ -7,15 +7,27 @@ all the things might be found to be reasonably clean at any given time.
 
 I am a Perl nerd, and I don't expect this software to be used by anyone but
 fellow Perl nerds.  You should at least know how to use CPAN to install the
-requested modules, although you can safely comment out the block containing
-`use Net::Twitter::Lite::WithAPIv1_1` if you have no intention of using this
-app with Twitter.
+requested modules, although many of the ones requested by `SimpleTweet.pm` can
+be safely commented out if you have no intention of using this app with Twitter.
 
-This should be considered an alpha release.  Expect falling rocks, etc.
+This should be considered a beta release.  I've been using this software for
+several months and the core features are pretty much set, but there is always
+room for improvement and further refinement.
 
 
 Changes
 -------
+
+### 12 Mar 2014
+
+New `SimpleTweet.pm` module encapsulates basic Twitter functionality and
+shares it with the command line script as well as the web server.  Both
+interfaces now tweet when the status of a job is manually changed, in
+addition to the periodic maintenance reminders as before.
+
+Tabs for viewing tasks assigned to a specific region have been added to
+the web interface.  A new `public/` subdirectory holds the relevant CSS file.
+
 
 ### 23 Jan 2014
 
@@ -35,7 +47,7 @@ interface; I don't anticipate such problems when using the web interface.
 ### 26 Sep 2013
 
 Includes a simple web service for updating percentages.  To get it working,
-just run websrv.pl and point your browser at localhost:3000.  You will need
+just run `websrv.pl` and point your browser at localhost:3000.  You will need
 to install the Dancer and Template modules from CPAN if you don't already have
 them.  The new views/ subdirectory contains the page templates.
 
@@ -88,7 +100,7 @@ Fixed a minor bug where negative totals were not recognized by the parser.
 
 ### 8 May 2013
 
-Initial release.
+Initial release of `clean_cli.pl`.
 
 
 Overview
@@ -96,12 +108,14 @@ Overview
 
 This distribution should contain the following files:
 
-- `CleanDB.pm`   (code module that interfaces with the database)
-- `README.md`    (these instructions)
-- `clean_cli.pl` (command line interface)
-- `housework.db` (a SQLite database)
-- `views/`       (subdirectory for web page templates)
-- `websrv.pl`    (server for web interface)
+- `CleanDB.pm`     (code module that interfaces with the database)
+- `README.md`      (these instructions)
+- `SimpleTweet.pm` (code module that interfaces with Twitter)
+- `clean_cli.pl`   (command line interface)
+- `housework.db`   (a SQLite database)
+- `public/`        (subdirectory for CSS files and web images)
+- `views/`         (subdirectory for web page templates)
+- `websrv.pl`      (server for web interface)
 
 Running `clean_cli.pl` will give you command line access to job status and
 the ability to add new jobs or edit existing jobs.  It expects `housework.db`
@@ -114,7 +128,7 @@ the user's home directory.  If the script is configured to post status updates
 to Twitter (more on that later), it will store the access codes as a Storable
 hash in `$HOME/.ssh/.cleanthings` with user-read-only (600) permissions.  You
 can change this location if you want by editing the value of `$twitter_file`
-in `clean_cli.pl`.
+in `SimpleTweet.pm`.
 
 Even if you primarily interact with the database through the web interface,
 you'll still want the command line script to run out of cron to do regular

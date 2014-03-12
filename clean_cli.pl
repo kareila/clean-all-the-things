@@ -21,23 +21,31 @@ use Getopt::Long;
 GetOptions( 'twitter' => \$tconf, 'maint' => \$maint, 'silent' => \$silent,
             'warn=i' => \$saynum, 'region=i' => \$region );
 
-use Storable;
+use lib '.';
+use SimpleTweet;
+
+# uncomment the line below to turn off Twitter posting
+# sub can_tweet { return 0 }  # <--- falls through to SimpleTweet if omitted
+# uncomment the line above to turn off Twitter posting
+
 my $skip_twitter = 0;
-my $twitter_file = $ENV{"HOME"} . "/.ssh/.cleanthings";
-my $twitter_info;
+my $tweet = sub {
+    return if $skip_twitter;
+    warn "Posting to Twitter using stored credentials.\n" unless $silent;
+    SimpleTweet::tweet(@_);
+};
 
-# check for saved Twitter auth info
-$twitter_info = Storable::retrieve $twitter_file if -f $twitter_file;
-# turn on SSL for Twitter if info was loaded
-$twitter_info->{ssl} = 1 if defined $twitter_info;
-
-if ( $maint && ! defined $twitter_info ) {
+if ( can_tweet() ) {
+    warn "Initialized Twitter API using stored credentials.\n\n" unless $silent;
+} else {
     $skip_twitter = 1;
-    warn "No Twitter access information found; will not post status updates.\n"
-        unless $silent;
+    unless ( $silent or $tconf ) {
+        my $msg = "please rerun with --twitter option to configure.\n";
+        $msg = "will not post status updates." if $maint;  # assume unattended
+        warn "No Twitter access info found; $msg\n";
+    }
 }
 
-use lib '.';
 use CleanDB;
 my $dbi = CleanDB->new( 'housework.db' );
 
@@ -59,7 +67,7 @@ my $db_load = sub {
 };
 $db_load->();
 
-if ( $maint ) {
+if ( $maint && ! $tconf ) {  # --twitter overrides --maint; requires user input
     exit 0 unless @jobs;  # nothing to do
     my %updated;
 
@@ -93,6 +101,7 @@ if ( $maint ) {
         exit 0 unless @j;  # nothing urgent
 
         my $twitter_status = '';
+        $twitter_status = '[' . $regnames{$region} . '] ' if $region;
         foreach (0..1) {
             next unless defined $j[$_];
             $twitter_status .= $j[$_]->{jobname} . ' (';
@@ -100,22 +109,8 @@ if ( $maint ) {
         }
         my $rem = scalar @j - 2;
         $twitter_status .= "+$rem more" if $rem > 0;
-        chomp $twitter_status;
-
-        if ( $twitter_status && ! $skip_twitter ) {
-            warn "Posting to Twitter using stored credentials.\n"
-                unless $silent;
-            use Net::Twitter::Lite::WithAPIv1_1;
-            # "Install Net::OAuth 0.25 or later for OAuth support"
-            use Net::OAuth;
-            # as of Jan 2014 this is required for SSL certs
-            use Mozilla::CA;
-
-            my $nt = Net::Twitter::Lite::WithAPIv1_1->new( %$twitter_info );
-            eval { $nt->update( $twitter_status ) };
-            warn "Twitter error: $@\n" if $@;
-        }
-
+        chomp $twitter_status;  # remove any trailing whitespace
+        $tweet->( $twitter_status );
         warn "$twitter_status\n" unless $silent;
 
     } else {
@@ -142,7 +137,8 @@ if ( $tconf ) {
          "Refer to http://dft.ba/-5AhL for more information.\n\n" unless $silent;
     warn "WARNING: cached Twitter tokens were found!!!\n" .
          "Proceed only if you wish to enter new tokens!\n" .
-         "Otherwise, rerun this script without the --twitter option.\n\n" if $twitter_info;
+         "Otherwise, rerun this script without the --twitter option.\n\n" if can_tweet();
+    my $twitter_info;
 
     # prompt for Twitter information
     foreach my $key ( qw( consumer_key consumer_secret access_token access_token_secret ) ) {
@@ -151,14 +147,10 @@ if ( $tconf ) {
         chomp $twitter_info->{$key};
         exit 0 unless length $twitter_info->{$key};
     }
-    Storable::store $twitter_info, $twitter_file;
-    chmod 0600, $twitter_file;
-    warn "Twitter information stored in $twitter_file\n\n" unless $silent;
-}
-
-unless ( -f $twitter_file ) {
-    warn "No Twitter access info found; please rerun with --twitter option to configure.\n\n"
-        unless $silent;
+    my $filename = SimpleTweet::write_config( $twitter_info );
+    warn "Twitter information stored in $filename\n\n" if $filename;
+    warn "This program must now exit. Rerun without the --twitter option for normal use.\n";
+    exit 0;
 }
 
 # enough about Twitter configuration, let's manage jobs.
@@ -251,6 +243,13 @@ sub prompt_edit {
         $delta = $p - $job->{currtotal} if defined $job->{currtotal};
         my $continue = &print_prompt( "Reset the urgency of this job to $p%? [Y/N] > " );
         if ( $continue && $continue =~ /^y/i ) {
+            my $twitter_status = '';
+            $twitter_status = '[' . $regnames{ $job->{regid} } . '] ' if $job->{regid};
+            $twitter_status .= $job->{jobname} . " changed from ";
+            $twitter_status .= $job->{currtotal} // 0;
+            $twitter_status .= "% to $p%.";
+            $tweet->( $twitter_status );
+
             $dbi->job_update_total( $job->{jobid}, $p );
             $dbi->job_timelog( $job->{jobid}, $delta );
             $db_load->();
