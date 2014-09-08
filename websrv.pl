@@ -39,6 +39,8 @@ any ['get', 'post'] => '/' => sub {
     my $regview = params->{"show"};
     $regview = '' unless $regview && $regnames{$regview};
 
+    my @messages;
+
     if ( request->method() eq "POST" ) {
         my ( %changes, %deltas, %unsynced );
 
@@ -67,17 +69,24 @@ any ['get', 'post'] => '/' => sub {
             };
         }
 
+        my $status_msg = sub {
+            my ( $job, $changed ) = @_;
+            return unless defined $changed;
+            my $msg = '';
+            $msg = '[' . $regnames{ $job->{regid} } . '] ' if $job->{regid};
+            $msg .= $job->{jobname} . " changed from ";
+            $msg .= $job->{currtotal} // 0;
+            $msg .= "% to " . $changed . "%.";
+            return $msg;
+        };
+
+        foreach my $job ( $dbi->jobs_as_list ) {
+            next unless exists $changes{ $job->{jobid} };
+            push @messages, $status_msg->( $job, $changes{ $job->{jobid} } );
+        }
+
         if ( can_tweet() ) {
-            foreach my $job ( $dbi->jobs_as_list ) {
-                next unless exists $changes{ $job->{jobid} };
-                my $twitter_status = '';
-                $twitter_status = '[' . $regnames{ $job->{regid} } . '] '
-                    if $job->{regid};
-                $twitter_status .= $job->{jobname} . " changed from ";
-                $twitter_status .= $job->{currtotal} // 0;
-                $twitter_status .= "% to " . $changes{ $job->{jobid} } . "%.";
-                SimpleTweet::tweet( $twitter_status );
-            }
+            SimpleTweet::tweet( $_ ) foreach @messages;
         }
 
         foreach my $id ( keys %changes ) {
@@ -99,6 +108,7 @@ any ['get', 'post'] => '/' => sub {
         joblist => \@joblist,
         regions  => \%regions,
         regnames => \%regnames,
+        messages => @messages ? \@messages : undef,
     };
 };
 

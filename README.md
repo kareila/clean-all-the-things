@@ -18,6 +18,13 @@ room for improvement and further refinement.
 Changes
 -------
 
+### 8 Sep 2014
+
+Added a new section above the tabs on the web interface which will print
+out the status messages when changes are submitted (in addition to posting
+them on Twitter), for better user feedback.
+
+
 ### 12 Mar 2014
 
 New `SimpleTweet.pm` module encapsulates basic Twitter functionality and
@@ -32,8 +39,8 @@ the web interface.  A new `public/` subdirectory holds the relevant CSS file.
 ### 23 Jan 2014
 
 Twitter now requires SSL connections to be used.  Relies on the Mozilla::CA
-module for certificate authority, which should be installed by default on most
-systems.
+module for certificate authority, which should be included automatically
+when the other Twitter-related modules are installed.
 
 
 ### 11 Nov 2013
@@ -49,7 +56,7 @@ interface; I don't anticipate such problems when using the web interface.
 Includes a simple web service for updating percentages.  To get it working,
 just run `websrv.pl` and point your browser at localhost:3000.  You will need
 to install the Dancer and Template modules from CPAN if you don't already have
-them.  The new views/ subdirectory contains the page templates.
+them.  The new `views/` subdirectory contains the page templates.
 
 
 ### 13 Sep 2013
@@ -280,4 +287,4 @@ The author of this software is in no way affiliated with the website
 application.
 
 
-_kareila at dreamwidth dot org // 23 Jan 2014_
+_kareila at dreamwidth dot org // 8 Sep 2014_

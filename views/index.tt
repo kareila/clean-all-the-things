@@ -13,6 +13,16 @@
 <body>
 <h1><% title %></h1>
 
+<%- IF messages -%>
+<div class="message">
+    <ul>
+    <%- FOREACH msg IN messages -%>
+        <li><% msg %></li>
+    <%- END -%>
+    </ul>
+</div>
+<%- END -%>
+
 <div class="tabs">
 
      <div class="<% IF ! regview; "active"; END %>"> <a href="/">

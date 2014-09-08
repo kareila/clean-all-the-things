@@ -38,3 +38,16 @@ div.tabs > div:not(.active) > div { /* Protect CSS1 & CSS2 browsers */
 div.tabs .active {
   outline: none;
 }
+
+
+
+div.message {
+    border: 0.25em solid #ccc;
+    background: #ffa;
+    margin-bottom: 1.5em;
+}
+
+div.message ul {
+    list-style: none;
+    line-height: 150%;
+}
